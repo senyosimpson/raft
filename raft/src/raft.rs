@@ -1,21 +1,24 @@
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::node::NodeId;
 
-enum EntryState {
+#[derive(Debug, Serialize, Deserialize)]
+pub enum EntryState {
     Pending,
     Replicated,
     Committed,
 }
 
 // Entry<State> ??
-struct Entry {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Entry {
     // Cmd is just a String for now. Will do something better in
     // follow up iterations
-    cmd: String,
-    term: u64,
-    index: u64,
-    state: EntryState,
+    pub cmd: String,
+    pub term: u64,
+    pub index: u64,
+    pub state: EntryState,
 }
 
 impl Entry {
@@ -25,7 +28,8 @@ impl Entry {
     }
 }
 
-struct AppendEntriesRequest {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppendEntriesRequest {
     /// The log entries
     pub entries: Vec<Entry>,
     /// The index of the next log entry to send to the given follower
@@ -39,16 +43,18 @@ struct AppendEntriesRequest {
     /// The ID of the leader node. Useful when redirecting clients
     pub leader_id: NodeId,
     /// Serial number submitted by the client
-    pub serial_number: Uuid,
+    pub serial_number: String,
 }
 
-enum AppendEntriesStatus {
+#[derive(Debug, Serialize)]
+pub enum AppendEntriesStatus {
     Successful,
     Rejected,
 }
 
-struct AppendEntriesResponse {
-    status: AppendEntriesStatus,
+#[derive(Debug, Serialize)]
+pub struct AppendEntriesResponse {
+    pub status: AppendEntriesStatus,
 }
 
 struct RequestVoteRequest {
