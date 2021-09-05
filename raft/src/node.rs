@@ -1,82 +1,73 @@
-use std::{fs::File, io::prelude::*, net::SocketAddr};
-
-use serde::{Deserialize, Serialize};
-use tide::{prelude::Status, Request};
-
-use crate::raft::{AppendEntriesRequest, AppendEntriesResponse, AppendEntriesStatus, Entry};
+use crate::raft::Entry;
+use flume::{Receiver, Sender};
 
 pub type NodeId = u64;
 
-struct Log {
-    storage: File,
+pub struct ReplicatedLog {
+    log: Vec<Entry>,
 }
 
-impl Log {
-    pub fn new(id: NodeId) -> Log {
-        let filename = format!("server-{}", id);
-        let file = File::create(filename).unwrap();
-
-        Log { storage: file }
+impl ReplicatedLog {
+    pub fn new() -> ReplicatedLog {
+        ReplicatedLog { log: Vec::new() }
     }
 
     pub fn append(&mut self, entry: Entry) {
-        self.storage.write_all(entry.cmd.as_bytes()).unwrap()
+        self.log.push(entry);
+    }
+
+    pub fn append_many(&mut self, entries: &mut Vec<Entry>) {
+        self.log.append(entries);
     }
 }
 
-pub enum NodeState {
-    Leader,
-    Follower,
-    Candidate,
+// Node states
+pub struct Follower;
+pub struct Candidate;
+pub struct Leader;
+
+
+pub struct Node<S> {
+    pub id: NodeId,
+    pub log: ReplicatedLog,
+    pub term: u64,
+    pub state: S,
+    pub mailbox: Receiver<Entry>,
+    pub friends: Vec<Sender<Entry>>,
 }
 
-// Node<State> ?? Read Ana's blog post again
-// https://hoverbear.org/blog/rust-state-machine-pattern/
-pub struct Node {
-    id: NodeId,
-    log: Log,
-    term: u64,
-    state: NodeState,
-}
+// Don't think this is necessary, at least now. But it does allow me
+// to implement any general functions applicable to a Node
+// pub trait NodeState {}
+// impl NodeState for Follower {}
+// impl NodeState for Candidate {}
+// impl NodeState for Leader {}
+// impl<S: NodeState> Node<S> {}
 
-impl Node {
-    pub fn new(id: NodeId, state: NodeState) -> Node {
-        let state = match state {
-            NodeState::Leader => NodeState::Leader,
-            NodeState::Follower | NodeState::Candidate => NodeState::Follower,
-        };
-
+impl Node<Follower> {
+    pub fn new(id: NodeId, mailbox: Receiver<Entry>, friends: Vec<Sender<Entry>>) -> Node<Follower> {
         Node {
             id: id,
-            log: Log::new(id),
+            log: ReplicatedLog::new(),
             term: 0,
-            state: state,
+            state: Follower {},
+            mailbox: mailbox,
+            friends: friends,
         }
     }
+}
 
-    /// Starts the state machine
-    pub async fn start(&self, port: u16) -> tide::Result<()> {
-        tide::log::start();
-        let mut server = tide::new();
-        let addr = SocketAddr::from(([127, 0, 0, 1], port));
-        server.at("/test/:name").post(hello);
-        server.at("/append-entry").post(append_entry);
-        server.listen(addr).await?;
-        Ok(())
+impl Node<Leader> {
+    // Currently a hack so I don't have to implement leader election right now.
+    // However, this is actually invalid. All Raft nodes start in Follower state
+    pub fn new(id: NodeId, mailbox: Receiver<Entry>, friends: Vec<Sender<Entry>>) -> Node<Leader> {
+        Node {
+            id: id,
+            log: ReplicatedLog::new(),
+            term: 0,
+            state: Leader {},
+            mailbox: mailbox,
+            friends: friends,
+        }
     }
-}
-
-async fn hello(req: Request<()>) -> tide::Result<String> {
-    let name = req.param("name")?;
-    Ok(format!("Hello, {}", name))
-}
-
-/// Start
-async fn append_entry(mut req: Request<()>) -> tide::Result<String> {
-    let append_entries: AppendEntriesRequest = req.body_json().await.unwrap();
-
-    // Ok(AppendEntriesResponse {
-    //     status: AppendEntriesStatus::Successful
-    // })
-    Ok("Success".into())
 }

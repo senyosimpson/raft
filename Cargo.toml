@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "cli",
+    "example",
     "raft"
 ]
