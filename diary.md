@@ -8,15 +8,15 @@
 The current mental model of how to put together my Raft implementation does not make sense. I was
 thinking that I'd have a Raft library which provides Raft functionality and embed that directly into
 a HTTP server i.e each server would be a Raft node. You would then have end points `appendEntries`
-and `RequestVote` end points. So stupid argghhhhhh.
+and `requestVote` end points. So stupid lmao.
 
 So what do we actually need?
 
 ![dist-db](./assets/distributed-database-arch.png)
 
 In the diagram above is an example architecture of a web service backed by a distributed database. This
-gives key insights into how I ought to think about this. First, Raft works on the *storage* system
-(obviously, c'mon Senyo!). Our Raft nodes are nodes of our storage system, not the HTTP servers themselves.
+gives key insights into how I ought to think about this. First, Raft works on the *storage* system.
+Our Raft nodes are nodes of our storage system, not the HTTP servers themselves.
 Each of the HTTP server replicas write to the same storage system and so we have one distributed database
 for the web service. In steps, the process would be:
 
